@@ -294,13 +294,18 @@ function setupEventListeners() {
     
     // Apply specifications button
     elements.btnApplySpecs.addEventListener("click", () => {
-        state.jobDescription = elements.jobDescInput.value.trim();
-        state.activeVersionId = null;
-        if (!Array.isArray(state.candidates) || state.candidates.length === 0) {
-            state.candidates = JSON.parse(JSON.stringify(MOCK_CANDIDATES));
+        try {
+            state.jobDescription = elements.jobDescInput.value.trim();
+            state.activeVersionId = null;
+            if (!Array.isArray(state.candidates) || state.candidates.length === 0) {
+                state.candidates = JSON.parse(JSON.stringify(MOCK_CANDIDATES));
+            }
+            screenAllCandidates();
+            renderTimeline();
+        } catch (err) {
+            console.error("Apply specs error:", err);
+            alert("Error applying specs. Check console for details.");
         }
-        screenAllCandidates();
-        renderTimeline();
     });
 
     // Reset app
@@ -616,6 +621,7 @@ async function screenAllCandidates() {
 }
 
 function evaluateCandidate(text) {
+    if (!text) text = "";
     const textLower = text.toLowerCase();
     const matchedQuals = [];
     const missingQuals = [];
@@ -750,6 +756,7 @@ function extractKeywords(text) {
 // UI Rendering Logic
 // ----------------------------------------------------
 function renderDashboard() {
+    if (!Array.isArray(state.candidates)) return;
     // 1. Clear Lists
     elements.suitableList.innerHTML = "";
     elements.unsuitableList.innerHTML = "";
@@ -1047,7 +1054,8 @@ function loadStateFromLocalStorage() {
     
     try {
         state.jobDescription = jd;
-        state.qualifications = JSON.parse(quals);
+        const parsedQuals = JSON.parse(quals);
+        state.qualifications = Array.isArray(parsedQuals) ? parsedQuals : [];
         const parsedCands = cands ? JSON.parse(cands) : [];
         state.candidates = Array.isArray(parsedCands) ? parsedCands : [];
         const parsedVers = vers ? JSON.parse(vers) : [];
@@ -1067,6 +1075,7 @@ function loadStateFromLocalStorage() {
 
 // Commit Spec Version
 function commitVersion(message) {
+    if (!Array.isArray(state.candidates)) state.candidates = [];
     const nextVerNum = state.versions.length + 1;
     const versionId = `v${nextVerNum}`;
     
@@ -1345,6 +1354,7 @@ function evaluateWithSpecs(text, jdText, qualTags) {
 
 // Custom Boundary Matching Engine (solves false-positive substring collisions)
 function matchKeyword(text, keyword) {
+    if (!text || !keyword) return false;
     const textLower = text.toLowerCase();
     const escaped = keyword.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
     // Boundary matching: checks that the keyword is not preceded or followed by standard alphanumeric characters.
@@ -1369,6 +1379,7 @@ function removeQualificationTag(val, tagElement) {
 
 // Render all candidates in temporary AI Loading card visual states
 function renderDashboardLoading() {
+    if (!Array.isArray(state.candidates)) return;
     state.candidates.forEach(cand => {
         cand.isLoading = true;
     });
