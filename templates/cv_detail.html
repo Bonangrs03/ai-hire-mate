@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-4">
+    <a href="/jobs/{{ job.id }}" class="text-sm text-indigo-600 hover:underline">&larr; Back to candidates</a>
+</div>
+
+{% set data = cv.extracted_json|default('{}')|safe %}
+{% set breakdown = cv.breakdown_json|default('{}')|safe %}
+
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-2xl font-bold" id="cv-name">-</h1>
+                    <p class="text-gray-500 text-sm" id="cv-email">-</p>
+                    <p class="text-gray-500 text-sm" id="cv-phone">-</p>
+                </div>
+                <div class="text-center">
+                    <div class="text-3xl font-bold {% if cv.score >= 70 %}text-green-600{% elif cv.score >= 40 %}text-yellow-600{% else %}text-red-500{% endif %}">{{ cv.score|int }}</div>
+                    <div class="text-xs text-gray-400">Score</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-3">AI Summary</h2>
+            <p class="text-sm text-gray-600">{{ cv.summary or 'No summary' }}</p>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-3">Skills</h2>
+            <div class="flex flex-wrap gap-2" id="cv-skills"></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-3">Experience</h2>
+            <div id="cv-experiences" class="space-y-3"></div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-3">Education</h2>
+            <div id="cv-education" class="space-y-2"></div>
+        </div>
+
+        {% set certs = data.certifications if data is mapping else [] %}
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-3">Certifications</h2>
+            <div id="cv-certs"></div>
+        </div>
+    </div>
+
+    <div class="space-y-4">
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-4">Score Breakdown</h2>
+            <div id="breakdown"></div>
+            <div class="mt-4 text-xs text-gray-400">Match against: {{ job.title }}</div>
+        </div>
+
+        <div class="bg-white rounded-xl shadow-sm border p-6">
+            <h2 class="font-semibold mb-3">Actions</h2>
+            <div class="space-y-2">
+                <button onclick="updateStatus('shortlisted')" class="w-full bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Shortlist</button>
+                <button onclick="updateStatus('rejected')" class="w-full border border-red-300 text-red-600 px-4 py-2 rounded-lg text-sm hover:bg-red-50">Reject</button>
+                <button onclick="updateStatus('completed')" class="w-full border border-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-50">Reset</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+const CV_ID = "{{ cv.id }}";
+const JOB_ID = "{{ job.id }}";
+
+let data = {};
+try {
+    const raw = {{ cv.extracted_json|safe }};
+    if (typeof raw === 'object') data = raw;
+    else data = JSON.parse(raw);
+} catch(e) {
+    try { data = JSON.parse(document.getElementById('raw-data').textContent); } catch(e2) {}
+}
+
+function setText(id, val) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = val || '-';
+}
+
+setText('cv-name', data.name);
+setText('cv-email', data.email);
+setText('cv-phone', data.phone);
+
+const skillsEl = document.getElementById('cv-skills');
+if (data.skills && data.skills.length) {
+    data.skills.forEach(s => {
+        const span = document.createElement('span');
+        span.className = 'bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full text-xs font-medium';
+        span.textContent = s;
+        skillsEl.appendChild(span);
+    });
+} else {
+    skillsEl.innerHTML = '<span class="text-gray-400 text-sm">-</span>';
+}
+
+const expEl = document.getElementById('cv-experiences');
+if (data.experiences && data.experiences.length) {
+    data.experiences.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'border-l-2 border-indigo-200 pl-3';
+        div.innerHTML = `<div class="font-medium text-sm">${e.role || '-'}</div><div class="text-xs text-gray-500">${e.company || ''} ${e.period ? '| '+e.period : ''}</div>`;
+        expEl.appendChild(div);
+    });
+} else {
+    expEl.innerHTML = '<span class="text-gray-400 text-sm">-</span>';
+}
+
+const eduEl = document.getElementById('cv-education');
+if (data.education && data.education.length) {
+    data.education.forEach(e => {
+        const div = document.createElement('div');
+        div.className = 'text-sm';
+        div.innerHTML = `<span class="font-medium">${e.degree || '-'}</span> — ${e.institution || ''} ${e.gpa ? '('+e.gpa+')' : ''}`;
+        eduEl.appendChild(div);
+    });
+} else {
+    eduEl.innerHTML = '<span class="text-gray-400 text-sm">-</span>';
+}
+
+const certsEl = document.getElementById('cv-certs');
+if (data.certifications && data.certifications.length) {
+    data.certifications.forEach(c => {
+        const div = document.createElement('div');
+        div.className = 'text-sm';
+        div.textContent = '- ' + c;
+        certsEl.appendChild(div);
+    });
+} else {
+    certsEl.innerHTML = '<span class="text-gray-400 text-sm">-</span>';
+}
+
+// Breakdown
+try {
+    const bd = {{ cv.breakdown_json|safe }};
+    const bEl = document.getElementById('breakdown');
+    const items = [
+        {label:'Total Score', val: bd.total_score, max:100},
+        {label:'Skills Match', val: bd.skills_score, max:50},
+        {label:'Experience', val: bd.experience_score, max:35},
+        {label:'Education', val: bd.education_score, max:15},
+    ];
+    items.forEach(item => {
+        const pct = (item.val / item.max) * 100;
+        const div = document.createElement('div');
+        div.className = 'mb-3';
+        div.innerHTML = `
+            <div class="flex justify-between text-xs mb-1">
+                <span>${item.label}</span>
+                <span class="font-medium">${item.val}/${item.max}</span>
+            </div>
+            <div class="w-full bg-gray-100 rounded-full h-2">
+                <div class="bg-indigo-500 h-2 rounded-full" style="width:${pct}%"></div>
+            </div>
+        `;
+        bEl.appendChild(div);
+    });
+} catch(e) {}
+
+async function updateStatus(status) {
+    const form = new FormData();
+    form.append('status', status);
+    await fetch(`/api/jobs/${JOB_ID}/cvs/${CV_ID}/status`, { method: 'PATCH', body: form });
+    alert('Status updated to: ' + status);
+}
+</script>
+<script id="raw-data" type="application/json">{{ cv.extracted_json|safe }}</script>
+{% endblock %}

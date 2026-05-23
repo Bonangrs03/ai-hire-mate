@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-6 flex items-center justify-between">
+    <div>
+        <h1 class="text-2xl font-bold">{{ job.title }}</h1>
+        <p class="text-sm text-gray-500 mt-1">Min Experience: {{ job.min_experience }} yrs | Min Education: {{ job.min_education or '-' }}</p>
+    </div>
+    <div class="flex gap-2">
+        <button onclick="exportCSV()" class="text-sm border px-3 py-1.5 rounded-lg hover:bg-gray-100">Export CSV</button>
+    </div>
+</div>
+
+{% if job.description %}
+<div class="bg-white rounded-xl shadow-sm border p-4 mb-4 text-sm text-gray-600">{{ job.description }}</div>
+{% endif %}
+
+<div class="bg-white rounded-xl shadow-sm border p-4 mb-6">
+    <h2 class="text-sm font-semibold mb-2">Upload CVs (PDF)</h2>
+    <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center" id="dropzone">
+        <p class="text-gray-400 text-sm">Drop PDF files here or click to browse</p>
+        <input type="file" id="fileInput" multiple accept=".pdf" class="hidden" onchange="uploadFiles(this.files)">
+    </div>
+    <div id="uploadProgress" class="mt-3 space-y-1 hidden"></div>
+    <button id="screenBtn" onclick="screenAll()" class="mt-3 bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 hidden">Run AI Screening</button>
+    <div id="screenProgress" class="mt-2 text-sm text-gray-500 hidden"></div>
+</div>
+
+<div class="bg-white rounded-xl shadow-sm border overflow-hidden">
+    <div class="p-4 border-b flex items-center justify-between">
+        <h2 class="font-semibold">Candidates ({{ cvs|length }})</h2>
+        <div class="flex gap-2 text-xs">
+            <a href="#" onclick="filterTable('all')" class="px-2 py-1 rounded bg-gray-200">All</a>
+            <a href="#" onclick="filterTable('shortlisted')" class="px-2 py-1 rounded hover:bg-gray-100">Shortlisted</a>
+            <a href="#" onclick="filterTable('rejected')" class="px-2 py-1 rounded hover:bg-gray-100">Rejected</a>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+            <thead class="bg-gray-50 text-left">
+                <tr>
+                    <th class="px-4 py-3 font-medium">#</th>
+                    <th class="px-4 py-3 font-medium">Name</th>
+                    <th class="px-4 py-3 font-medium">Score</th>
+                    <th class="px-4 py-3 font-medium">Skills</th>
+                    <th class="px-4 py-3 font-medium">Status</th>
+                    <th class="px-4 py-3 font-medium"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cv in cvs %}
+                <tr class="border-t hover:bg-gray-50 {% if cv.status == 'rejected' %}opacity-60{% endif %}" data-status="{{ cv.status }}">
+                    <td class="px-4 py-3">{{ loop.index }}</td>
+                    <td class="px-4 py-3 font-medium">
+                        {% set ext = cv.extracted_json|default('{}')|safe %}
+                        {% set data = ext|replace('True', 'true')|replace('False', 'false') %}
+                        <span id="name-{{ cv.id }}">-</span>
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if cv.score > 0 %}
+                        <span class="font-bold {% if cv.score >= 70 %}text-green-600{% elif cv.score >= 40 %}text-yellow-600{% else %}text-red-500{% endif %}">{{ cv.score|int }}</span>
+                        {% else %}
+                        <span class="text-gray-300">-</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 max-w-xs truncate">
+                        {% set ext = cv.extracted_json|default('{}')|safe %}
+                        <span id="skills-{{ cv.id }}">-</span>
+                    </td>
+                    <td class="px-4 py-3">
+                        {% if cv.status == 'completed' %}
+                        <span class="text-green-600 text-xs font-medium">Screened</span>
+                        {% elif cv.status == 'shortlisted' %}
+                        <span class="text-blue-600 text-xs font-medium">Shortlisted</span>
+                        {% elif cv.status == 'rejected' %}
+                        <span class="text-red-500 text-xs font-medium">Rejected</span>
+                        {% else %}
+                        <span class="text-yellow-500 text-xs font-medium">{{ cv.status }}</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3 text-right">
+                        <a href="/jobs/{{ job.id }}/cvs/{{ cv.id }}" class="text-indigo-600 text-xs hover:underline">View</a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+const JOB_ID = "{{ job.id }}";
+
+document.getElementById('dropzone').onclick = () => document.getElementById('fileInput').click();
+document.getElementById('dropzone').ondragover = (e) => { e.preventDefault(); e.currentTarget.classList.add('border-indigo-400'); };
+document.getElementById('dropzone').ondragleave = (e) => { e.currentTarget.classList.remove('border-indigo-400'); };
+document.getElementById('dropzone').ondrop = (e) => { e.preventDefault(); e.currentTarget.classList.remove('border-indigo-400'); uploadFiles(e.dataTransfer.files); };
+
+async function uploadFiles(files) {
+    const prog = document.getElementById('uploadProgress');
+    prog.classList.remove('hidden');
+    prog.innerHTML = '';
+    const form = new FormData();
+    for (const f of files) form.append('files', f);
+    prog.innerHTML = `<p class="text-sm text-gray-500">Uploading ${files.length} file(s)...</p>`;
+    const r = await fetch(`/api/jobs/${JOB_ID}/upload`, { method: 'POST', body: form });
+    const d = await r.json();
+    prog.innerHTML = `<p class="text-sm text-green-600">✅ ${d.uploaded} CV(s) uploaded</p>`;
+    document.getElementById('screenBtn').classList.remove('hidden');
+}
+
+async function screenAll() {
+    const btn = document.getElementById('screenBtn');
+    btn.disabled = true;
+    btn.textContent = 'Screening...';
+    const prog = document.getElementById('screenProgress');
+    prog.classList.remove('hidden');
+    prog.innerHTML = '⏳ Processing CVs with AI...';
+    const r = await fetch(`/api/jobs/${JOB_ID}/screen`, { method: 'POST' });
+    const d = await r.json();
+    prog.innerHTML = `✅ ${d.screened || 'All'} CV(s) screened. Reloading...`;
+    setTimeout(() => location.reload(), 1000);
+}
+
+function filterTable(s) {
+    document.querySelectorAll('tbody tr').forEach(tr => {
+        if (s === 'all') tr.style.display = '';
+        else tr.style.display = tr.dataset.status === s ? '' : 'none';
+    });
+}
+
+async function exportCSV() {
+    const r = await fetch(`/api/jobs/${JOB_ID}/export`);
+    const d = await r.json();
+    const blob = new Blob([d.csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'candidates.csv';
+    a.click();
+}
+
+// Parse extracted JSON to fill names
+document.querySelectorAll('[id^="name-"]').forEach(el => {
+    const id = el.id.replace('name-', '');
+    const raw = document.getElementById('raw-' + id);
+    if (raw) {
+        try {
+            const data = JSON.parse(raw.textContent);
+            el.textContent = data.name || '-';
+            document.getElementById('skills-' + id).textContent = (data.skills || []).join(', ') || '-';
+        } catch(e) {}
+    }
+});
+</script>
+
+{% for cv in cvs %}
+<script id="raw-{{ cv.id }}" type="application/json">{{ cv.extracted_json|safe }}</script>
+{% endfor %}
+{% endblock %}

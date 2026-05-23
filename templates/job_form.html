@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">Create New Job</h1>
+    <form method="POST" action="/jobs" class="bg-white rounded-xl shadow-sm border p-6 space-y-4">
+        <div>
+            <label class="block text-sm font-medium mb-1">Job Title *</label>
+            <input name="title" required class="w-full border rounded-lg px-3 py-2 text-sm">
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Job Description</label>
+            <textarea name="description" rows="4" class="w-full border rounded-lg px-3 py-2 text-sm"></textarea>
+        </div>
+        <div>
+            <label class="block text-sm font-medium mb-1">Required Skills (JSON array with weights)</label>
+            <input name="skills" value='[{"name":"React","weight":10},{"name":"Laravel","weight":8},{"name":"TypeScript","weight":7}]' class="w-full border rounded-lg px-3 py-2 text-sm font-mono">
+            <p class="text-xs text-gray-400 mt-1">e.g. [{"name":"React","weight":10}]</p>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Min Experience (years)</label>
+                <input name="min_experience" type="number" value="0" class="w-full border rounded-lg px-3 py-2 text-sm">
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Min Education</label>
+                <input name="min_education" placeholder="e.g. S1" class="w-full border rounded-lg px-3 py-2 text-sm">
+            </div>
+        </div>
+        <button type="submit" class="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 text-sm">Create Job</button>
+    </form>
+</div>
+{% endblock %}
