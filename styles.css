@@ -580,6 +580,15 @@ header {
     color: #000;
 }
 
+.candidates-list {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    padding-right: 0.25rem;
+}
+
 .empty-state {
     text-align: center;
     padding: 3rem 1rem;
